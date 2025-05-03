@@ -1,22 +1,44 @@
-import useSWR from 'swr';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Loader, Info } from 'lucide-react';
-
-const fetcher = url => fetch(url).then(res => res.json());
 
 export default function ProductPage() {
     const router = useRouter();
     const { id } = router.query;
+    const [product, setProduct] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const { data: product, error } = useSWR(
-        () => id ? `/api/products/${id}` : null,
-        fetcher
-    );
+    useEffect(() => {
+        if (!id) return;
+
+        // Using the API URL from environment variable or falling back to relative path
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+            ? `${process.env.NEXT_PUBLIC_API_URL}/api/products/${id}`
+            : `/api/products/${id}`;
+
+        fetch(apiUrl)
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(res.status === 404 ? 'Product not found' : 'Failed to load product');
+                }
+                return res.json();
+            })
+            .then(data => {
+                setProduct(data);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error('Error fetching product:', err);
+                setError(err.message);
+                setLoading(false);
+            });
+    }, [id]);
 
     if (error) return (
         <div className="max-w-xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-lg dark:bg-gray-800 text-center">
             <Info size={40} className="mx-auto text-red-500 mb-2" />
-            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">Failed to load product</h2>
+            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">{error}</h2>
             <button
                 className="mt-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md transition-colors"
                 onClick={() => router.push('/')}
@@ -26,7 +48,7 @@ export default function ProductPage() {
         </div>
     );
 
-    if (!product) return (
+    if (loading) return (
         <div className="max-w-xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-lg dark:bg-gray-800 text-center">
             <Loader size={40} className="mx-auto animate-spin text-blue-500 mb-2" />
             <h2 className="text-xl font-semibold text-gray-600 dark:text-gray-300">Loading product details...</h2>
