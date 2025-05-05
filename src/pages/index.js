@@ -9,27 +9,45 @@ export default function HomePage() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        // Using the API URL from environment variable or falling back to relative path
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
             ? `${process.env.NEXT_PUBLIC_API_URL}/api/products`
             : '/api/products';
 
-        fetch(apiUrl)
-            .then(res => {
+        const fetchProducts = async () => {
+            try {
+                const res = await fetch(apiUrl);
+
                 if (!res.ok) {
-                    throw new Error('Failed to fetch products');
+                    // Try to get meaningful error message from server
+                    const errorText = await res.text();
+                    // Log only in dev
+                    if (process.env.NODE_ENV === 'development') {
+                        console.error(`Server responded with status ${res.status}: ${errorText}`);
+                    }
+
+                    setError('Failed to load products. Please try again later.');
+                    return;
                 }
-                return res.json();
-            })
-            .then(data => {
+
+                const data = await res.json();
                 setProducts(data);
+            } catch (err) {
+                if (process.env.NODE_ENV === 'development') {
+                    console.error('Fetch failed:', err);
+                }
+
+                let message = 'Unable to load products. Please check your network or try again later.';
+                if (err.name === 'TypeError') {
+                    message = 'Server is unreachable. Please make sure the backend is running.';
+                }
+
+                setError(message);
+            } finally {
                 setLoading(false);
-            })
-            .catch(err => {
-                console.error('Error fetching products:', err);
-                setError(err.message);
-                setLoading(false);
-            });
+            }
+        };
+
+        fetchProducts();
     }, []);
 
     return (
@@ -50,8 +68,11 @@ export default function HomePage() {
                 </div>
             ) : error ? (
                 <div className="text-center py-10">
-                    <p className="text-red-500 dark:text-red-400 text-lg">
-                        Error: {error}. Please try again later.
+                    <p className="text-red-600 dark:text-red-400 text-xl font-semibold mb-2">
+                        Something went wrong.
+                    </p>
+                    <p className="text-gray-600 dark:text-gray-300">
+                        {error} <br /> Please refresh the page or try again later.
                     </p>
                 </div>
             ) : (
@@ -68,7 +89,7 @@ export default function HomePage() {
                                         <div className="p-4 border rounded-lg hover:shadow-md transition-shadow duration-200 bg-gray-50 dark:bg-gray-700 hover:bg-white dark:hover:bg-gray-600">
                                             <h2 className="font-medium text-lg text-gray-800 dark:text-white">{product.name}</h2>
                                             <p className="text-sm text-gray-500 dark:text-gray-300 mt-2">
-                                                {product.description.substring(0, 80)}...
+                                                {product.description?.substring(0, 80)}...
                                             </p>
                                             <div className="mt-3 text-blue-500 text-sm">View details →</div>
                                         </div>
@@ -81,4 +102,5 @@ export default function HomePage() {
             )}
         </div>
     );
+
 }
